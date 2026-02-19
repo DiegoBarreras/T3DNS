@@ -161,7 +161,7 @@ case $1 in
 		echo "IP Actual de la tarjeta de red (Red Interna):"
 		ip addr show enp0s8 | grep "inet " | awk '{print $2}' | cut -d/ -f1
 
-		local metodo=$(nmcli -f ipv4.method con show "red_interna" | awk '{print $2}')
+		metodo=$(nmcli -f ipv4.method con show "red_interna" | awk '{print $2}')
 
 		if [[ $metodo == "manual" ]]; then
 			echo "La tarjeta de red enp0s8 ya tiene una IP estatica configurada."
