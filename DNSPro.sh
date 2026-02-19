@@ -64,6 +64,21 @@ validarNoAptos() {
 	fi
 }
 
+verificarip() {
+	echo "IP Actual de la tarjeta de red (Red Interna):"
+	ip addr show enp0s8 | grep "inet " | awk '{print $2}' | cut -d/ -f1
+
+	metodo=$(nmcli -f ipv4.method con show "red_interna" | awk '{print $2}')
+
+	if [[ $metodo == "manual" ]]; then
+		echo "La tarjeta de red enp0s8 ya tiene una IP estatica configurada."
+		return 0
+	else
+		echo "La tarjeta de red enp0s8 aun no tiene una IP fija configurada. Es decir, es dinamica."
+		return 1
+	fi		
+}
+
 if [[ $# -eq 0 ]]; then
 	echo -e "\n"
 	echo -e "---------------------------------------------"
@@ -158,21 +173,6 @@ case $1 in
 	;;
 
     --verificarip)
-		verificarip() {
-			echo "IP Actual de la tarjeta de red (Red Interna):"
-			ip addr show enp0s8 | grep "inet " | awk '{print $2}' | cut -d/ -f1
-
-			metodo=$(nmcli -f ipv4.method con show "red_interna" | awk '{print $2}')
-
-			if [[ $metodo == "manual" ]]; then
-				echo "La tarjeta de red enp0s8 ya tiene una IP estatica configurada."
-				return 0
-			else
-				echo "La tarjeta de red enp0s8 aun no tiene una IP fija configurada. Es decir, es dinamica."
-				return 1
-			fi		
-		}
-
 		verificarip
     ;;
 
