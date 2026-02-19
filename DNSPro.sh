@@ -158,54 +158,85 @@ case $1 in
 	;;
 
     --verificarip)
-		echo "IP Actual de la tarjeta de red (Red Interna):"
-		ip addr show enp0s8 | grep "inet " | awk '{print $2}' | cut -d/ -f1
+		verificarip() {
+			echo "IP Actual de la tarjeta de red (Red Interna):"
+			ip addr show enp0s8 | grep "inet " | awk '{print $2}' | cut -d/ -f1
 
-		metodo=$(nmcli -f ipv4.method con show "red_interna" | awk '{print $2}')
+			metodo=$(nmcli -f ipv4.method con show "red_interna" | awk '{print $2}')
 
-		if [[ $metodo == "manual" ]]; then
-			echo "La tarjeta de red enp0s8 ya tiene una IP estatica configurada."
+			if [[ $metodo == "manual" ]]; then
+				echo "La tarjeta de red enp0s8 ya tiene una IP estatica configurada."
+				return 0
+			else
+				echo "La tarjeta de red enp0s8 aun no tiene una IP fija configurada. Es decir, es dinamica."
+				return 1
+			fi		
+		}
+
+		verificarip
+    ;;
+
+    --asignarip)
+		verificarip
+		read -p "Deseas re/asignar tu direccion IP? s/n " res
+		res=${res,,}
+		if [[ $res == "s" ]]; then
+			while true; do
+				read -p "Inserta el tipo de clase para la nueva direccion IP: (A, B, C) " claseIP
+				claseIP=${claseIP,,}
+
+				if [[ $claseIP != "a"  && $claseIP != "b" && $claseIP != "c" ]]; then
+					echo "Inserta una clase valida."
+					continue
+				else
+					echo -e "\n"
+					break
+				fi
+			done
+
+			while true; do
+				read -p "Inserta la nueva direccion IP: " dirIP
+				if validacionIP "$dirIP"; then
+					if validarNoAptos "$dirIP"; then
+						sacarMascara "$dirIP"
+						if validarMascara; then
+							#oct4Ini=$(echo $dirIP | cut -d. -f4)
+							if [[ $claseIP == "a" ]]; then
+								prefijoF="/8"
+							elif [[ $claseIP == "b" ]]; then
+								prefijoF="/16"
+							elif [[ $claseIP == "c" ]]; then
+								prefijoF="/24"
+							else
+								echo "ERROR: No hay un tipo de clase especifico."
+								exit 0
+							fi
+
+							sudo nmcli connection modify "red_interna" ipv4.method manual
+							sudo nmcli connection modify "red_interna" ipv4.addresses ${dirIP}${prefijoF} #192.168.1.150/24
+							sudo nmcli connection down "red_interna"
+							sudo nmcli connection up "red_interna"
+
+							echo -e "\n"
+							break
+						else
+							echo "Inserta una direccion IP que concuerde con la clase seleccionada."
+							continue
+						fi
+					else
+						echo "Inserta una direccion IP valida."
+					fi
+				else
+					echo "Inserta una direccion IP con formato valido."
+					continue
+				fi
+			done
 		else
-			echo "La tarjeta de red enp0s8 aun no tiene una IP fija configurada. Es decir, es dinamica."
+			echo -e "No se asignara una IP estatica nueva.\n"
 		fi
     ;;
 
 	--newconfig)
-		while true; do
-			read -p "Inserta el tipo de clase para el rango de direcciones IP: (A, B, C) " claseIP
-			claseIP=${claseIP,,}
-
-			if [[ $claseIP != "a"  && $claseIP != "b" && $claseIP != "c" ]]; then
-				echo "Inserta una clase valida."
-				continue
-			else
-				echo -e "\n"
-				break
-			fi
-		done
-
-		while true; do
-			read -p "Inserta el limite inicial del rango de direcciones IP: " limInicial
-			if validacionIP "$limInicial"; then
-				if validarNoAptos "$limInicial"; then
-					sacarMascara "$limInicial"
-					if validarMascara; then
-						oct4Ini=$(echo $limInicial | cut -d. -f4)
-						echo -e "\n"
-						break
-					else
-						echo "Inserta una direccion IP que concuerde con la clase seleccionada."
-						continue
-					fi
-				else
-					echo "Inserta una direccion IP valida."
-				fi
-			else
-				echo "Inserta una direccion IP con formato valido."
-				continue
-			fi
-		done
-
 		while true; do
 		        read -p "Inserta el limite final del rango de direcciones IP: " limFinal
 		        if validacionIP "$limFinal"; then
