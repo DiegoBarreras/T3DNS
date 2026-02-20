@@ -251,7 +251,7 @@ case $1 in
 
 				nmcli connection show
 				metodo=$(nmcli -g ipv4.method connection show "red_interna")
-				direc=$(nmcli -g IP4.ADDRESS device show | cut -d/ -f1)
+				direc=$(nmcli -g IP4.ADDRESS device show enp0s8 | cut -d/ -f1)
 
 				if [[ $metodo == "auto" ]]; then
 					echo "Primero asigna una IP estática."
