@@ -250,7 +250,7 @@ case $1 in
 				fi
 
 				nmcli connection show
-				metodo=$(nmcli -g ipv4.method connection show "NOMBRE_DE_LA_CONEXION")
+				metodo=$(nmcli -g ipv4.method connection show "red_interna")
 				direc=$(nmcli -g IP4.ADDRESS device show | cut -d/ -f1)
 
 				if [[ $metodo == "auto" ]]; then
