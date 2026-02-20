@@ -113,8 +113,6 @@ if [[ $# -eq 0 ]]; then
     echo -e "./DNSPro.sh --pruebasdns\n"
 fi
 
-dirIp=0;
-
 case $1 in
 	--verificarinst)
 		verificar() {
@@ -221,7 +219,6 @@ case $1 in
 							sudo nmcli connection down "red_interna"
 							sudo nmcli connection up "red_interna"
 
-							dirIp=$dirIP
 							echo -e "\n"
 							break
 						else
@@ -252,12 +249,16 @@ case $1 in
 					echo "El servicio named esta detenido. Iniciando configuracion desde cero."
 				fi
 
-				if [[ $dirIp == "0" ]]; then
+				nmcli connection show
+				metodo=$(nmcli -g ipv4.method connection show "NOMBRE_DE_LA_CONEXION")
+				direc=$(nmcli -g IP4.ADDRESS device show | cut -d/ -f1)
+
+				if [[ $metodo == "auto" ]]; then
 					echo "Primero asigna una IP estática."
 					exit 1
 				fi
 
-				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${dirIp}; };" /etc/named.conf
+				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${direc}; };" /etc/named.conf
 				sudo sed -i "s/allow-query     { localhost; };/allow-query     { any; };/" /etc/named.conf
 
 				read -p "Inserta el nombre de la zona DNS: " nomZona
