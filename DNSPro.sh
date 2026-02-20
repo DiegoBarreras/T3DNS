@@ -369,7 +369,7 @@ EOF
 		direc=$(nmcli -g IP4.ADDRESS device show enp0s8 | head -n1 | cut -d/ -f1)
 		echo -e "\nProbando resolucion DNS..."
 
-		resultado=$(nslookup $nomZona 2>/dev/null | awk '/^Address: / {print $2}' | tail -n1)
+		resultado=$(nslookup $nomZona $direc 2>/dev/null | awk '/^Address: / {print $2}' | tail -n1)
 
 		if [[ "$resultado" == "$direc" ]]; then
 			echo "Resolucion correcta para $nomZona ==> $resultado"
@@ -382,7 +382,7 @@ EOF
 
 		echo -e "\nProbando www.$nomZona..."
 
-		resultadoWWW=$(nslookup www.$nomZona 2>/dev/null | awk '/^Address: / {print $2}' | tail -n1)
+		resultadoWWW=$(nslookup www.$nomZona $direc 2>/dev/null | awk '/^Address: / {print $2}' | tail -n1)
 
 		if [[ "$resultadoWWW" == "$direc" ]]; then
 			echo "Resolucion correcta para www.$nomZona -> $resultadoWWW"
