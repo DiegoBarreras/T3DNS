@@ -100,17 +100,11 @@ if [[ $# -eq 0 ]]; then
 	echo -e "Para escribir una nueva configuracion al servidor DNS:"
 	echo -e "./DNSPro.sh --newconfig\n"
 
-	echo -e "Para mostrar la configuracion actual:"
-	echo -e "./DNSPro.sh --verconfig\n"
-
 	echo -e "Para reiniciar el servicio:"
     echo -e "./DNSPro.sh --restartserv\n"
 
-    echo -e "Módulo de Monitoreo:"
+    echo -e "Módulo de Monitoreo & Pruebas:"
     echo -e "./DNSPro.sh --monitor\n"
-
-    echo -e "Pruebas de DNS:"
-    echo -e "./DNSPro.sh --pruebasdns\n"
 fi
 
 case $1 in
@@ -385,13 +379,14 @@ EOF
 		resultadoWWW=$(nslookup www.$nomZona $direc 2>/dev/null | awk '/^Address: / {print $2}' | tail -n1)
 
 		if [[ "$resultadoWWW" == "$direc" ]]; then
-			echo "Resolucion correcta para www.$nomZona -> $resultadoWWW"
+			echo "Resolucion correcta para www.$nomZona ==> $resultadoWWW"
 		else
 			echo "Resolucion incorrecta para www."
 			exit 1
 		fi
 
 		echo -e "\nMONITOREO COMPLETADO EXITOSAMENTE."
+		break
 	done
 ;;
 esac
