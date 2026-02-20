@@ -113,6 +113,8 @@ if [[ $# -eq 0 ]]; then
     echo -e "./DNSPro.sh --pruebasdns\n"
 fi
 
+dirIp=0;
+
 case $1 in
 	--verificarinst)
 		verificar() {
@@ -212,11 +214,14 @@ case $1 in
 								exit 0
 							fi
 
-							sudo nmcli connection modify "red_interna" ipv4.method manual
-							sudo nmcli connection modify "red_interna" ipv4.addresses ${dirIP}${prefijoF} #192.168.1.150/24
+							sudo nmcli connection modify "red_interna" \
+								ipv4.method manual \
+								ipv4.addresses "${dirIP}${prefijoF}"
+
 							sudo nmcli connection down "red_interna"
 							sudo nmcli connection up "red_interna"
 
+							dirIp=$dirIP
 							echo -e "\n"
 							break
 						else
@@ -237,345 +242,61 @@ case $1 in
     ;;
 
 	--newconfig)
-		while true; do
-		        read -p "Inserta el limite final del rango de direcciones IP: " limFinal
-		        if validacionIP "$limFinal"; then
-				case $claseIP in
-					"a")
-						if [[ $(echo $limInicial | cut -d. -f1) == $(echo $limFinal | cut -d. -f1) ]]; then
-                                                	valIniA=$(( $(echo $limInicial | cut -d. -f2) * 65536 + $(echo $limInicial | cut -d. -f3) * 256 + $(echo $limInicial | cut -d. -f4) ))
-                                                        valFinA=$(( $(echo $limFinal | cut -d. -f2) * 65536 + $(echo $limFinal | cut -d. -f3) * 256 + $(echo $limFinal | cut -d. -f4) ))
-                                                        if [[ $valIniA -lt $valFinA ]]; then
-								prefijo=$(echo $limInicial | cut -d. -f1)
-								subnet=$(echo "$prefijo.0.0.0")
-                                                                echo -e "\n"
-                                                                break
-                                                        else
-                                                                echo "Inserta una direccion mayor a la especificada previamente."
-                                                                continue
-                                                        fi
-                                        	else
-                                                	echo "Inserta una direccion IP con un prefijo valido."
-                                                	continue
-                                        	fi
-						;;
+    	while true; do
+			if [[ -f "/etc/named.conf" ]]; then
+				echo "El archivo named.conf fue encontrado. Guardando... "
+				if systemctl is-active --quiet named; then
+					echo "El servicio named esta corriendo. Se procedera a apagarlo para actualizar la configuracion."
+					sudo systemctl stop named
+				else
+					echo "El servicio named esta detenido. Iniciando configuracion desde cero."
+				fi
 
-					"b")
-						if [[ $(echo $limInicial | cut -d. -f1-2) == $(echo $limFinal | cut -d. -f1-2) ]]; then
-                                                	valIniB=$(( $(echo $limInicial | cut -d. -f3) * 256 + $(echo $limInicial | cut -d. -f4) ))
-							valFinB=$(( $(echo $limFinal | cut -d. -f3) * 256 + $(echo $limFinal | cut -d. -f4) ))
-							if [[ $valIniB -lt $valFinB ]]; then
-								prefijo=$(echo $limInicial | cut -d. -f1-2)
-								subnet=$(echo "$prefijo.0.0")
-								echo -e "\n"
-								break
-							else
-								echo "Inserta una direccion mayor a la especificada previamente."
-								continue
-							fi
-                                        	else
-                                                	echo "Inserta una direccion IP con un prefijo valido."
-                                                	continue
-                                        	fi
-						;;
+				if [[ $dirIp == "0" ]]; then
+					echo "Primero asigna una IP estática."
+					exit 1
+				fi
 
-					"c")
-						if [[ $(echo $limInicial | cut -d. -f1-3) == $(echo $limFinal | cut -d. -f1-3) ]]; then
-							if [[ $oct4Ini -lt $(echo $limFinal | cut -d. -f4) ]]; then
-								prefijo=$(echo $limInicial | cut -d. -f1-3)
-								subnet=$(echo "$prefijo.0")
-								echo -e "\n"
-								break
-							else
-								echo "Inserta una direccion mayor a la especificada previamente."
-								continue
-							fi
-                                        	else
-                                                	echo "Inserta una direccion IP con un prefijo valido."
-                                                	continue
-                                        	fi
-						;;
-				esac
-			else
-				echo "Inserta una direccion IP con formato valido"
-				continue
-			fi
-		done
+				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${dirIp}; };" /etc/named.conf
+				sudo sed -i "s/allow-query     { localhost; };/allow-query     { any; };/" /etc/named.conf
 
-		while true; do
-		        read -p "Inserta el Lease Time (Segundos): " segLease
-		        if [[ -z "$segLease" ]]; then
-		        	echo "Inserta el Lease Time.";
-				continue
-		        elif [[ $segLease =~ ^[0-9]+$ ]]; then
-				echo -e "\n"
-				break
-			else
-		                echo "Inserta un numero."
-				continue
-		        fi
-		done
+				read -p "Inserta el nombre de la zona DNS: " nomZona
 
-		oct4Fin=$(echo $limFinal | cut -d. -f4)
-
-		while true; do
-			read -p "Deseas insertar una direccion IP especifica para el Gateway? s/n " resGw
-			resGw=${resGw,,}
-			if [[ $resGw == "s" ]]; then 
-				read -p "Inserta la direccion IP para el Gateway: $prefijo." final
-
-				gateway="${prefijo}.${final}"
-
-				if ! validacionIP "$gateway" || ! validarNoAptos "$gateway"; then
-					echo "Inserta un Gateway valido."
+				if [[ ! $nomZona =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$ ]]; then
+					echo "Nombre de zona inválido."
 					continue
 				fi
 
-				case $claseIP in
-                                        "a")
-                                                valGwA=$(( $(echo $gateway | cut -d. -f2) * 65536 + $(echo $gateway | cut -d. -f3) * 256 + $(echo $gateway | cut -d. -f4) ))
-                                                if [[ $valGwA -lt $valIniA || $valGwA -gt $valFinA ]]; then
-                                                        echo -e "\n"
-                                                        break
-                                                else
-                                                        echo "Inserta una direccion fuera del rango previamente establecido."
-                                                        continue
-                                                fi
-                                                ;;
-
-                                        "b")
-                                                valGwB=$(( $(echo $gateway | cut -d. -f3) * 256 + $(echo $gateway | cut -d. -f4) ))
-                                                if [[ $valGwB -lt $valIniB || $valGwB -gt $valFinB ]]; then
-                                                        echo -e "\n"
-                                                        break
-                                                else
-                                                        echo "Inserta una direccion fuera del rango previamente establecido."
-                                                        continue
-                                                fi
-                                                ;;
-
-                                        "c")
-                                                valGwC=$(( $(echo $gateway | cut -d. -f4) ))
-                                                if [[ $valGwC -lt $(echo $limInicial | cut -d. -f4) || $valGwC -gt $(echo $limFinal | cut -d. -f4) ]]; then
-                                                        echo -e "\n"
-                                                        break
-                                                else
-                                                        echo "Inserta una direccion fuera del rango previamente establecido."
-                                                        continue
-                                                fi
-                                                ;;
-                                esac
-			elif [[ $resGw == "n" ]]; then
-				echo -e "\n"
-				break
-			else
-				echo "Inserta una opcion valida."
-				continue
-			fi
-		done
-
-		while true; do
-                        read -p "Deseas insertar una direccion IP especifica para el DNS Server? s/n " resDns
-                        resDns=${resDns,,}
-                        if [[ $resDns == "s" ]]; then
-				read -p "Inserta la direccion IP para el DNS Server: " dns
-
-				if ! validacionIP "$dns" || ! validarNoAptos "$dns" || [[ "$dns" == "$gateway" ]]; then
-                                        echo "Inserta una direccion valida."
-                                        continue
+				if grep -q "zone \"$nomZona\"" /etc/named.conf; then
+					echo "La zona ya existe."
+					continue
 				else
-					read -p "Deseas insertar una direccion IP secundaria para el DNS Server? s/n " resDns2
-		                        resDns2=${resDns2,,}
-		                        if [[ $resDns2 == "s" ]]; then
-		                                read -p "Inserta la direccion IP para el DNS Server: " dns2
 
-		                                if ! validacionIP "$dns2" || ! validarNoAptos "$dns2" || [[ "$dns2" == "$gateway" ]]; then
-		                                        echo "Inserta una direccion valida."
-		                                        continue
-		                                else
-		                                        echo -e "\n"
-		                                        break
-		                                fi
-		                        elif [[ $resDns2 == "n" ]]; then
-		                                echo -e "\n"
-		                                break
-		                        else
-		                                echo "Inserta una opcion valida."
-		                                continue
-		                        fi
-                                fi
-			elif [[ $resDns == "n" ]]; then
-				echo -e "\n"
-				break
+sudo tee -a /etc/named.conf > /dev/null <<EOF
+
+zone "$nomZona" IN {
+	type master;
+	file "/var/named/$nomZona.zone";
+	allow-update { none; };
+};
+
+EOF
+	
+				sudo named-checkconf /etc/named.conf
+				fi
+
+				if [ $? -ne 0 ]; then
+					echo "Error de sintaxis en /etc/named.conf."
+					continue
+				else 
+					echo -e "Archivo /etc/named.conf correctamente actualizado.\n"
+					sudo systemctl restart named
+					break
+				fi
 			else
-				echo "Inserta una opcion valida."
+				echo "El archivo named.conf no fue encontrado.."
 				continue
 			fi
 		done
-
-		if [[ -z "$gateway" ]]; then
-                	gwLinea="# No se configuro el Gateway."
-                else
-                	gwLinea="option routers $gateway;"
-                fi
-
-		if [[ -z "$dns" ]]; then
-			dnsLinea="# No se configuro el DNS."
-		else
-			if [[ -z "$dns2" ]]; then
-				dnsLinea="option domain-name-servers $dns;"
-			else
-		        	dnsLinea="option domain-name-servers $dns, $dns2;"
-		        fi
-		fi
-
-		if [[ -f "/etc/dhcp/dhcpd.conf" ]]; then
-		    	echo "El archivo dhcpd.conf fue encontrado. Guardando... "
-
-cat <<EOF | sudo tee /etc/dhcp/dhcpd.conf > /dev/null
-ddns-update-style none;
-authoritative;
-
-subnet $subnet netmask $mask {
-    range $limInicial $limFinal;
-    $gwLinea
-    $dnsLinea
-    default-lease-time $segLease;
-}
-EOF
-
-	                if [[ $? -eq 0 ]]; then
-	                        echo -e "El archivo fue guardado correctamente.\n"
-	                        systemctl restart dhcpd
-
-	                else
-	                        echo "Archivo no guardado. Revisa los permisos."
-	                        exit 1
-	                fi
-		else
-			echo "El archivo dhcpd.conf no fue encontrado.."
-                        exit 1
-		fi
-
-		while true; do
-
-			read -p "Inserta una nueva IP para el servidor: $prefijo." finNuevaIp
-			nuevaIp="${prefijo}.${finNuevaIp}"
-
-			if ! validacionIP "$nuevaIp" || ! validarNoAptos "$nuevaIp"; then
-	                	echo "Inserta una direccion IP valida."
-	                        continue
-			else
-                		case $claseIP in
-                                	"a")
-						valNuevaIp=$(( $(echo $nuevaIp | cut -d. -f2) * 65536 + $(echo $nuevaIp | cut -d. -f3) * 256 + $(echo $nuevaIp | cut -d. -f4) ))
-						if [[ $valNuevaIp -lt $valIniA || $valNuevaIp -gt $valFinA ]]; then
-							echo "La IP insertada es valida."
-							sudo nmcli con mod "red_interna" ipv4.addresses $nuevaIp/24
-							sudo nmcli con mod "red_interna" ipv4.method manual
-							sudo nmcli con up "red_interna"
-							echo "Direccion IP actualizada exitosamente."
-							sudo firewall-cmd --add-service=dhcp --permanent
-                                                        sudo firewall-cmd --reload
-							break
-						else
-							echo "Inserta una direccion fuera del rango."
-							continue
-						fi
-						;;
-
-					"b")
-                                                valNuevaIp=$(( $(echo $nuevaIp | cut -d. -f3) * 256 + $(echo $nuevaIp | cut -d. -f4) ))
-                                                if [[ $valNuevaIp -lt $valIniB || $valNuevaIp -gt $valFinB ]]; then
-                                                        echo "La IP insertada es valida."
-							sudo nmcli con mod "red_interna" ipv4.addresses $nuevaIp/16
-                                                        sudo nmcli con mod "red_interna" ipv4.method manual
-                                                        sudo nmcli con up "red_interna"
-                                                        echo "Direccion IP actualizada exitosamente."
-							sudo firewall-cmd --add-service=dhcp --permanent
-                                                        sudo firewall-cmd --reload
-							break
-
-                                                else
-                                                        echo "Inserta una direccion fuera del rango."
-							continue
-                                                fi
-                                                ;;
-
-					"c")
-                                                valNuevaIp=$(( $(echo $nuevaIp | cut -d. -f4) ))
-                                                if [[ $valNuevaIp -lt $(echo $limInicial | cut -d. -f4) || $valNuevaIp -gt $(echo $limFinal | cut -d. -f4) ]]; then
-                                                        echo "La IP insertada es valida."
-							sudo nmcli con mod "red_interna" ipv4.addresses $nuevaIp/8
-                                                        sudo nmcli con mod "red_interna" ipv4.method manual
-                                                        sudo nmcli con up "red_interna"
-                                                        echo "Direccion IP actualizada exitosamente."
-							sudo firewall-cmd --add-service=dhcp --permanent
-							sudo firewall-cmd --reload
-							break
-                                                else
-                                                        echo "Inserta una direccion fuera del rango."
-                                                        continue
-                                                fi
-                                                ;;
-				esac
-			fi
-		done
-		;;
-
-	--restartserv)
-                echo -e "Validando configuración antes de reiniciar...\n"
-                dhcpd -t -cf /etc/dhcp/dhcpd.conf > /tmp/dhcp_error 2>&1
-                
-                if [[ $? -ne 0 ]]; then
-                        echo "¡Error de sintaxis detectado!"
-                        cat /tmp/dhcp_error | grep "line" 
-                        exit 1
-                fi
-
-                echo "Sintaxis OK. Reiniciando servicio..."
-                systemctl restart dhcpd
-                
-                if [[ $? -eq 0 ]]; then
-                        echo "Servicio iniciado correctamente."
-                        exit 0
-                else
-                        echo "Error crítico: El servicio no pudo iniciar a pesar de tener sintaxis correcta."
-                        journalctl -u dhcpd -n 10 --no-pager
-                        exit 1
-                fi
-        ;;
-
-	--verconfig)
-		echo -e "Configuracion actual:\n"
-		sudo cat /etc/dhcp/dhcpd.conf
 	;;
-
-	--monitor)
-		echo -e "\nEstado del servicio:"
-		if systemctl is-active dhcpd > /dev/null; then
-			echo -e "El servicio esta activo.\n"
-		else
-			echo "El servicio esta apagado o no existe."
-		fi
-
-		echo -e "\nConcesiones activas:"
-                if [[ -f "/var/lib/dhcpd/dhcpd.leases" ]]; then
-                        echo "El archivo dhcpd.leases fue encontrado.\n"
-		        if [ -s /var/lib/dhcpd/dhcpd.leases ]; then
-		        	sudo cat /var/lib/dhcpd/dhcpd.leases
-		    	else
-		        	echo "No hay concesiones activas actualmente."
-			fi
-                else
-                        echo "Error: No se encuentra el archivo /var/lib/dhcpd/dhcpd.leases. Por favor instala el paquete dhcp-server, o bien crea el archivo."
-                fi
-
-		echo -e "\nValidación de sintaxis de dhcpd.conf:"
-		sudo dhcpd -t -cf /etc/dhcp/dhcpd.conf &> /dev/null
-		if [ $? -eq 0 ]; then
-			echo "La sintaxis de dhcpd.conf es CORRECTA"
-		else
-		        echo "La sintaxis de dhcpd.conf es ERRONEA"
-		fi
 esac
