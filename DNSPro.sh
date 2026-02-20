@@ -264,7 +264,7 @@ case $1 in
 				read -p "Inserta el nombre de la zona DNS: " nomZona
 
 				if [[ ! $nomZona =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$ ]]; then
-					echo "Nombre de zona inválido."
+					echo -e "Nombre de zona inválido.\n"
 					continue
 				fi
 
@@ -292,7 +292,34 @@ EOF
 				else 
 					echo -e "Archivo /etc/named.conf correctamente actualizado.\n"
 					sudo systemctl restart named
-					break
+
+					if [[ -f "/var/named/$nomZona.zone" ]]; then
+						echo "La zona ya existe."
+					else
+
+sudo tee /var/named/$nomZona.zone > /dev/null <<EOF
+\$TTL 86400
+@   IN  SOA ns1.$nomZona. admin.$nomZona. (
+        2026022001 ; Serial
+        3600       ; Refresh
+        1800       ; Retry
+        604800     ; Expire
+        86400 )    ; Minimum TTL
+
+@       IN  NS      ns1.$nomZona.
+ns1     IN  A       $direc
+@       IN  A       $direc
+www     IN  A       $direc
+EOF
+
+						sudo named-checkzone $nomZona /var/named/$nomZona.zone
+						if [ $? -ne 0 ]; then
+							echo "Error de sintaxis en /var/named/$nomZona.zone."
+							continue
+						else
+							break
+						fi
+					fi
 				fi
 			else
 				echo "El archivo named.conf no fue encontrado.."
