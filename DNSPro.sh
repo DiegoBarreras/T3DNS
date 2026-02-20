@@ -243,7 +243,6 @@ case $1 in
 					echo "El servicio named esta detenido. Iniciando configuracion desde cero."
 				fi
 
-				nmcli connection show
 				metodo=$(nmcli -g ipv4.method connection show "red_interna")
 				direc=$(nmcli -g IP4.ADDRESS device show enp0s8 | cut -d/ -f1)
 
@@ -325,6 +324,7 @@ EOF
 
 	--restartserv)
 		sudo systemctl restart named
+		echo -e "Servicio reiniciado exitosamente.\n"
 	;;
 
 	--monitor)
