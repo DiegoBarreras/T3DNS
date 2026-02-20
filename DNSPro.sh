@@ -317,6 +317,7 @@ EOF
 							echo "Error de sintaxis en /var/named/$nomZona.zone."
 							continue
 						else
+							sudo systemctl restart named
 							break
 						fi
 					fi
@@ -327,4 +328,70 @@ EOF
 			fi
 		done
 	;;
+
+	--restartserv)
+		sudo systemctl restart named
+	;;
+
+	--monitor)
+	while true; do
+		read -p "Inserta el nombre de la zona que buscas: " nomZona
+
+		if [[ ! $nomZona =~ ^[a-zA-Z0-9-]+\.[a-zA-Z0-9.-]+$ ]]; then
+			echo -e "Nombre de zona inválido.\n"
+			continue
+		fi
+
+		echo -e "\nVerificando servicio DNS..."
+		if systemctl is-active --quiet named; then
+			echo "Servicio named ACTIVO."
+		else
+			echo "Servicio named INACTIVO."
+			exit 1
+		fi
+
+		echo -e "\nVerificando sintaxis de named.conf..."
+		if sudo named-checkconf /etc/named.conf; then
+			echo "Sintaxis correcta en named.conf."
+		else
+			echo "Error en sintaxis de named.conf."
+			exit 1
+		fi
+
+		echo -e "\nVerificando archivo de zona..."
+		if sudo named-checkzone $nomZona /var/named/$nomZona.zone; then
+			echo "Sintaxis de zona $nomZona correcta."
+		else
+			echo "Error en archivo de zona."
+			exit 1
+		fi
+
+		direc=$(nmcli -g IP4.ADDRESS device show enp0s8 | head -n1 | cut -d/ -f1)
+		echo -e "\nProbando resolucion DNS..."
+
+		resultado=$(nslookup $nomZona 2>/dev/null | awk '/^Address: / {print $2}' | tail -n1)
+
+		if [[ "$resultado" == "$direc" ]]; then
+			echo "Resolucion correcta para $nomZona ==> $resultado"
+		else
+			echo "Resolucion incorrecta."
+			echo "Esperado: $direc"
+			echo "Obtenido: $resultado"
+			exit 1
+		fi
+
+		echo -e "\nProbando www.$nomZona..."
+
+		resultadoWWW=$(nslookup www.$nomZona 2>/dev/null | awk '/^Address: / {print $2}' | tail -n1)
+
+		if [[ "$resultadoWWW" == "$direc" ]]; then
+			echo "Resolucion correcta para www.$nomZona -> $resultadoWWW"
+		else
+			echo "Resolucion incorrecta para www."
+			exit 1
+		fi
+
+		echo -e "\nMONITOREO COMPLETADO EXITOSAMENTE."
+	done
+;;
 esac
