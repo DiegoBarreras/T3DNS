@@ -244,6 +244,7 @@ case $1 in
 				fi
 
 				metodo=$(nmcli -g ipv4.method connection show "red_interna")
+				direcDNS=$(nmcli -g IP4.ADDRESS device show enp0s8 | cut -d/ -f1)
 
 				read -p "Deseas utilizar la IP local del servidor en la configuracion? s/n " resIp
 				resIp=${resIp,,}
@@ -258,7 +259,7 @@ case $1 in
 					exit 1
 				fi
 
-				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${nmcli -g IP4.ADDRESS device show enp0s8 | cut -d/ -f1}; };" /etc/named.conf
+				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${$direcDNS}; };" /etc/named.conf
 				sudo sed -i "s/allow-query     { localhost; };/allow-query     { any; };/" /etc/named.conf
 
 				read -p "Inserta el nombre de la zona DNS: " nomZona
