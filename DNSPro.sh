@@ -244,7 +244,14 @@ case $1 in
 				fi
 
 				metodo=$(nmcli -g ipv4.method connection show "red_interna")
-				direc=$(nmcli -g IP4.ADDRESS device show enp0s8 | cut -d/ -f1)
+
+				read -p "Deseas utilizar la IP local del servidor? s/n " resIp
+				resIp=${resIp,,}
+				if [[ $resIp == "s" ]]; then
+					direc=$(nmcli -g IP4.ADDRESS device show enp0s8 | cut -d/ -f1)
+				else
+					read -p "Inserta una IP valida:" direc
+				fi
 
 				if [[ $metodo == "auto" ]]; then
 					echo "Primero asigna una IP estática."
