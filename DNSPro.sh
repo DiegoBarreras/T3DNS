@@ -259,7 +259,7 @@ case $1 in
 					exit 1
 				fi
 
-				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${$direcDNS}; };" /etc/named.conf
+				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${direcDNS}; };" /etc/named.conf
 				sudo sed -i "s/allow-query     { localhost; };/allow-query     { any; };/" /etc/named.conf
 
 				read -p "Inserta el nombre de la zona DNS: " nomZona
