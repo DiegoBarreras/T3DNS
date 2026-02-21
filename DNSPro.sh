@@ -194,7 +194,6 @@ case $1 in
 					if validarNoAptos "$dirIP"; then
 						sacarMascara "$dirIP"
 						if validarMascara; then
-							#oct4Ini=$(echo $dirIP | cut -d. -f4)
 							if [[ $claseIP == "a" ]]; then
 								prefijoF="/8"
 							elif [[ $claseIP == "b" ]]; then
@@ -259,7 +258,7 @@ case $1 in
 					exit 1
 				fi
 
-				sudo sed -i "/listen-on port 53/c\listen-on port 53 { 127.0.0.1; ${direcDNS}; };" /etc/named.conf
+				sudo sed -i "s|listen-on port 53 {.*};|listen-on port 53 { 127.0.0.1; ${direcDNS}; };|" /etc/named.conf
 				sudo sed -i "s/allow-query     { localhost; };/allow-query     { any; };/" /etc/named.conf
 
 				read -p "Inserta el nombre de la zona DNS: " nomZona
@@ -271,7 +270,7 @@ case $1 in
 
 				if grep -q "zone \"$nomZona\"" /etc/named.conf; then
 					echo "La zona ya existe."
-					continue
+					break
 				else
 
 sudo tee -a /etc/named.conf > /dev/null <<EOF
@@ -296,6 +295,7 @@ EOF
 
 					if [[ -f "/var/named/$nomZona.zone" ]]; then
 						echo "La zona ya existe."
+						break
 					else
 
 sudo tee /var/named/$nomZona.zone > /dev/null <<EOF
@@ -319,6 +319,8 @@ EOF
 							continue
 						else
 							sudo systemctl restart named
+							sudo firewall-cmd --add-service=dns --permanent
+							sudo firewall-cmd --reload
 							break
 						fi
 					fi
