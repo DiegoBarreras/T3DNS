@@ -1,3 +1,10 @@
+# ============================================================
+#   DNSPro.ps1 - DNS Server Script (Windows PowerShell)
+#   Adaptado desde DNSPro.sh (Bash/Linux)
+# ============================================================
+
+# ---------- FUNCIONES AUXILIARES ----------
+
 function ValidacionIP {
     param([string]$ip)
     $regex = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
@@ -74,14 +81,16 @@ function VerificarIP {
 
     $adapterFull = Get-NetIPAddress -InterfaceAlias "Ethernet" -AddressFamily IPv4 -ErrorAction SilentlyContinue
     if ($adapterFull -and $adapterFull.PrefixOrigin -eq "Manual") {
-        Write-Host "El adaptador Ethernet ya tiene una IP estatica configurada."
+        Write-Host "El adaptador red_interna ya tiene una IP estatica configurada."
         return $true
     }
     else {
-        Write-Host "El adaptador Ethernet aun no tiene una IP fija configurada. Es decir, es dinamica."
+        Write-Host "El adaptador red_interna aun no tiene una IP fija configurada. Es decir, es dinamica."
         return $false
     }
 }
+
+# ---------- MENU (sin argumentos) ----------
 
 if ($args.Count -eq 0) {
     Write-Host "`n"
@@ -112,8 +121,11 @@ if ($args.Count -eq 0) {
     exit
 }
 
+# ---------- SWITCH PRINCIPAL ----------
+
 switch ($args[0]) {
 
+    # ----------------------------------------
     "--verificarinst" {
         function Verificar {
             param([string]$feature)
@@ -133,6 +145,7 @@ switch ($args[0]) {
         break
     }
 
+    # ----------------------------------------
     "--instalar" {
         function Instalar {
             param([string]$feature)
@@ -179,11 +192,13 @@ switch ($args[0]) {
         break
     }
 
+    # ----------------------------------------
     "--verificarip" {
         VerificarIP | Out-Null
         break
     }
 
+    # ----------------------------------------
     "--asignarip" {
         VerificarIP | Out-Null
 
@@ -220,16 +235,44 @@ switch ($args[0]) {
 
                             $adapterName = "Ethernet"
                             $existingIP = Get-NetIPAddress -InterfaceAlias $adapterName -AddressFamily IPv4 -ErrorAction SilentlyContinue
+
                             if ($existingIP) {
-                                Remove-NetIPAddress -InterfaceAlias $adapterName -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue
+                                try {
+                                    Set-NetIPAddress `
+                                        -InterfaceAlias $adapterName `
+                                        -IPAddress $existingIP.IPAddress `
+                                        -PrefixLength $prefijo `
+                                        -ErrorAction Stop | Out-Null
+
+                                    $currentIP = (Get-NetIPAddress -InterfaceAlias $adapterName -AddressFamily IPv4).IPAddress
+                                    if ($currentIP -ne $dirIP) {
+                                        Remove-NetIPAddress -InterfaceAlias $adapterName -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue
+                                        Start-Sleep -Seconds 1
+                                        New-NetIPAddress `
+                                            -InterfaceAlias $adapterName `
+                                            -IPAddress $dirIP `
+                                            -PrefixLength $prefijo `
+                                            -ErrorAction Stop | Out-Null
+                                    }
+                                }
+                                catch {
+                                    Remove-NetIPAddress -InterfaceAlias $adapterName -AddressFamily IPv4 -Confirm:$false -ErrorAction SilentlyContinue
+                                    Start-Sleep -Seconds 2
+                                    New-NetIPAddress `
+                                        -InterfaceAlias $adapterName `
+                                        -IPAddress $dirIP `
+                                        -PrefixLength $prefijo `
+                                        -ErrorAction Stop | Out-Null
+                                }
+                            }
+                            else {
+                                New-NetIPAddress `
+                                    -InterfaceAlias $adapterName `
+                                    -IPAddress $dirIP `
+                                    -PrefixLength $prefijo `
+                                    -ErrorAction Stop | Out-Null
                             }
 
-                            New-NetIPAddress `
-                                -InterfaceAlias $adapterName `
-                                -IPAddress $dirIP `
-                                -PrefixLength $prefijo `
-                                -ErrorAction Stop | Out-Null
-                            \
                             Disable-NetAdapter -Name $adapterName -Confirm:$false
                             Start-Sleep -Seconds 2
                             Enable-NetAdapter -Name $adapterName -Confirm:$false
@@ -260,9 +303,10 @@ switch ($args[0]) {
         break
     }
 
+    # ----------------------------------------
     "--newconfig" {
         while ($true) {
-            $namedConf = "C:\Windows\System32\dns\named.conf"  
+            $namedConf = "C:\Windows\System32\dns\named.conf"
             $zoneDir = "C:\Windows\System32\dns"
 
             $svcDNS = Get-Service -Name "DNS" -ErrorAction SilentlyContinue
@@ -283,7 +327,23 @@ switch ($args[0]) {
                     Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.*" } |
                     Select-Object -First 1
                 }
-                $direc = $adapterIP.IPAddress
+
+                $resIp = Read-Host "Deseas utilizar la IP local del servidor en la configuracion? s/n"
+                $resIp = $resIp.ToLower()
+                if ($resIp -eq "s") {
+                    $direc = $adapterIP.IPAddress
+                }
+                else {
+                    while ($true) {
+                        $direc = Read-Host "Inserta una direccion IP"
+                        if (ValidacionIP $direc) {
+                            break
+                        }
+                        else {
+                            Write-Host "Inserta una direccion IP con formato valido."
+                        }
+                    }
+                }
 
                 $ipConf = Get-NetIPAddress -InterfaceAlias "Ethernet" -AddressFamily IPv4 -ErrorAction SilentlyContinue
                 if ($ipConf -and $ipConf.PrefixOrigin -ne "Manual") {
@@ -301,7 +361,7 @@ switch ($args[0]) {
                 $zonaExistente = Get-DnsServerZone -Name $nomZona -ErrorAction SilentlyContinue
                 if ($zonaExistente) {
                     Write-Host "La zona ya existe."
-                    continue
+                    break
                 }
 
                 try {
@@ -359,12 +419,14 @@ switch ($args[0]) {
         break
     }
 
+    # ----------------------------------------
     "--restartserv" {
         Restart-Service -Name DNS
         Write-Host "Servicio reiniciado exitosamente.`n"
         break
     }
 
+    # ----------------------------------------
     "--monitor" {
         while ($true) {
             $nomZona = Read-Host "Inserta el nombre de la zona que buscas"
