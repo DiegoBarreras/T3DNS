@@ -1,4 +1,4 @@
-source "$(dirname "$0")/funciones/funciones.sh"
+source "$(dirname "$0")/funciones.sh"
 
 if [[ $# -eq 0 ]]; then
 	echo -e "\n"
