@@ -33,25 +33,25 @@ if ($args.Count -eq 0) {
 switch ($args[0]) {
 
     "--verificarinst" {
-        Verificar "DNS"
-        Verificar "RSAT-DNS-Server"
+        verificar_feature "DNS"
+        verificar_feature "RSAT-DNS-Server"
         break
     }
 
     "--instalar" {
         Write-Host "Re/Instalacion de Caracteristicas: `n"
-        Instalar "DNS"
-        Instalar "RSAT-DNS-Server"
+        instalar_feature "DNS"
+        instalar_feature "RSAT-DNS-Server"
         break
     }
 
     "--verificarip" {
-        VerificarIP | Out-Null
+        verificarIP | Out-Null
         break
     }
 
     "--asignarip" {
-        VerificarIP | Out-Null
+        verificarIP | Out-Null
         $res = Read-Host "Deseas re/asignar tu direccion IP? s/n"
         if ($res.ToLower() -eq "s") {
             while ($true) {
@@ -62,10 +62,10 @@ switch ($args[0]) {
 
             while ($true) {
                 $dirIP = Read-Host "Inserta la nueva direccion IP"
-                if (ValidacionIP $dirIP) {
-                    if (ValidarNoAptos $dirIP) {
-                        SacarMascara $dirIP | Out-Null
-                        if (ValidarMascara) {
+                if (validacionIP $dirIP) {
+                    if (validarNoAptos $dirIP) {
+                        sacarMascara $dirIP | Out-Null
+                        if (validarMascara) {
                             $prefijo = obtener_cidr $script:claseIP
                             $adapterName = "Ethernet"
                             $existingIP = Get-NetIPAddress -InterfaceAlias $adapterName -AddressFamily IPv4 -ErrorAction SilentlyContinue
@@ -124,7 +124,7 @@ switch ($args[0]) {
                 else {
                     while ($true) {
                         $direc = Read-Host "Inserta una direccion IP"
-                        if (ValidacionIP $direc) { break }
+                        if (validacionIP $direc) { break }
                         else { Write-Host "Inserta una direccion IP con formato valido." }
                     }
                 }
